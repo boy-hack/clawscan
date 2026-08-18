@@ -4564,6 +4564,35 @@ func TestRenderClawHubAIGPromptIncludesAIGEvidence(t *testing.T) {
 	}
 }
 
+func TestRenderClawHubPromptIncludesAIGEvidenceForProductionProfile(t *testing.T) {
+	// The production "clawhub" profile (not just the retired "clawhub-aig"
+	// candidate) now runs aig alongside skillspector and clawscan-static, so
+	// its SARIF evidence must reach the Codex judge whenever it produced a
+	// result, regardless of which profile label requested the run. The
+	// pre-scan malicious-signal heuristic is unchanged by this and still
+	// keys off clawscan-static for the "clawhub" profile label.
+	prompt, err := RenderClawHubPrompt("SYSTEM", Artifact{
+		Profile: "clawhub",
+		Scanners: map[string]ScannerResult{
+			"skillspector":    {Raw: json.RawMessage(`{"status":"clean"}`)},
+			"clawscan-static": {Raw: json.RawMessage(`{"schemaVersion":"clawscan-static-v1","findings":[]}`)},
+			"aig":             {Raw: json.RawMessage(`{"version":"2.1.0","runs":[{"results":[{"ruleId":"T04","level":"error"}]}]}`)},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"SkillSpector findings supplied to Codex:",
+		"A.I.G SARIF evidence supplied to Codex:",
+		`"ruleId": "T04"`,
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
 func TestRenderClawHubPromptIgnoresLegacyVirusTotalEvidence(t *testing.T) {
 	prompt, err := RenderClawHubPrompt("SYSTEM", Artifact{
 		Context: json.RawMessage(`{"skillSpectorCheckedAt":123}`),

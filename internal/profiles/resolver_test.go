@@ -30,7 +30,7 @@ func TestResolveArgsUsesEmbeddedClawHubProfile(t *testing.T) {
 	if opts.ConfigSource != "built-in" {
 		t.Fatalf("config source = %q, want built-in", opts.ConfigSource)
 	}
-	if got := strings.Join(opts.Scanners, ","); got != "skillspector,clawscan-static" {
+	if got := strings.Join(opts.Scanners, ","); got != "skillspector,clawscan-static,aig" {
 		t.Fatalf("scanners = %q", got)
 	}
 	if len(opts.GateRules) != 0 {
@@ -66,7 +66,7 @@ func TestResolveArgsUsesEmbeddedClawHubProfile(t *testing.T) {
 	if string(opts.Judge.Files["clawhub/output.schema.json"]) == "" {
 		t.Fatal("expected embedded clawhub output schema file")
 	}
-	if got := strings.Join(opts.Sandbox.Env, ","); got != "OPENAI_API_KEY,CODEX_API_KEY,SKILLSPECTOR_PROVIDER" {
+	if got := strings.Join(opts.Sandbox.Env, ","); got != "OPENAI_API_KEY,CODEX_API_KEY,SKILLSPECTOR_PROVIDER,LLM_API_KEY" {
 		t.Fatalf("sandbox env = %q", got)
 	}
 }
@@ -358,7 +358,7 @@ func TestResolveArgsAllowsExplicitProfileWithoutTarget(t *testing.T) {
 	if opts.Target != "" {
 		t.Fatalf("target = %q", opts.Target)
 	}
-	if got := strings.Join(opts.Scanners, ","); got != "skillspector,clawscan-static" {
+	if got := strings.Join(opts.Scanners, ","); got != "skillspector,clawscan-static,aig" {
 		t.Fatalf("scanners = %q", got)
 	}
 }
@@ -369,7 +369,9 @@ func TestResolveArgsDoesNotRequireVirusTotalForClawHubProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := runner.ValidateRequirements(opts, map[string]string{}); err != nil {
+	// OPENAI_API_KEY is already required by the ClawHub Codex judge for this
+	// profile, and aig's requirement is satisfied by that same key.
+	if err := runner.ValidateRequirements(opts, map[string]string{"OPENAI_API_KEY": "present"}); err != nil {
 		t.Fatalf("unexpected requirement error: %v", err)
 	}
 	if strings.Contains(strings.Join(opts.Sandbox.Env, ","), "VIRUSTOTAL_API_KEY") {
@@ -691,7 +693,7 @@ func TestResolveArgsAppliesCLIOverrides(t *testing.T) {
 	if opts.Sandbox.Image != "ghcr.io/acme/runtime:v1" {
 		t.Fatalf("sandbox image = %q", opts.Sandbox.Image)
 	}
-	if got := strings.Join(opts.Sandbox.Env, ","); got != "OPENAI_API_KEY,CODEX_API_KEY,SKILLSPECTOR_PROVIDER,ANTHROPIC_API_KEY" {
+	if got := strings.Join(opts.Sandbox.Env, ","); got != "OPENAI_API_KEY,CODEX_API_KEY,SKILLSPECTOR_PROVIDER,LLM_API_KEY,ANTHROPIC_API_KEY" {
 		t.Fatalf("sandbox env = %q", got)
 	}
 }

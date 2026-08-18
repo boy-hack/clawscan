@@ -1570,10 +1570,10 @@ func RenderClawHubPrompt(systemPromptSource string, artifact Artifact) (string, 
 		return "", err
 	}
 	var supplemental []clawhubprompt.ScannerEvidence
-	if artifact.Profile == clawHubAIGProfileID {
+	if aigAnalysis := clawHubAIGAnalysis(artifact); aigAnalysis != nil {
 		supplemental = append(supplemental, clawhubprompt.ScannerEvidence{
 			Label: "A.I.G SARIF evidence supplied to Codex",
-			Value: clawHubAIGAnalysis(artifact),
+			Value: aigAnalysis,
 		})
 	}
 	return clawhubprompt.Build(

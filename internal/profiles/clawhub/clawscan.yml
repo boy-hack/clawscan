@@ -5,11 +5,13 @@ profiles:
     scanners:
       - skillspector
       - clawscan-static
+      - aig
     sandbox:
       env:
         - OPENAI_API_KEY
         - CODEX_API_KEY
         - SKILLSPECTOR_PROVIDER
+        - LLM_API_KEY
     judge:
       command: >-
         [ -n "$CODEX_API_KEY" ] || export CODEX_API_KEY="$OPENAI_API_KEY";

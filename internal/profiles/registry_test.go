@@ -26,7 +26,7 @@ func TestDefaultProfileRegistryContainsEmbeddedBuiltIns(t *testing.T) {
 	if !ok {
 		t.Fatal("missing clawhub profile")
 	}
-	if got := strings.Join(profileScannerIDs(clawhub.profile.Scanners), ","); got != "skillspector,clawscan-static" {
+	if got := strings.Join(profileScannerIDs(clawhub.profile.Scanners), ","); got != "skillspector,clawscan-static,aig" {
 		t.Fatalf("clawhub scanners = %q", got)
 	}
 	if clawhub.configDir != "clawhub" {
@@ -91,7 +91,7 @@ func TestInspectProfilesReturnsBuiltIns(t *testing.T) {
 	if !ok {
 		t.Fatal("missing clawhub profile")
 	}
-	if got := strings.Join(profileScannerIDs(clawhub.Profile.Scanners), ","); got != "skillspector,clawscan-static" {
+	if got := strings.Join(profileScannerIDs(clawhub.Profile.Scanners), ","); got != "skillspector,clawscan-static,aig" {
 		t.Fatalf("clawhub scanners = %q", got)
 	}
 	if clawhub.Source != "built-in" {

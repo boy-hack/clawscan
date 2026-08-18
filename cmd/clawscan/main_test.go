@@ -542,7 +542,7 @@ profiles:
 		"Scanners",
 		"clawhub",
 		"built-in",
-		"skillspector, clawscan-static",
+		"skillspector, clawscan-static, aig",
 		"clawhub-aig",
 		"skillspector, aig",
 	} {
@@ -1041,12 +1041,15 @@ func TestRunCommandUsesBuiltInProfile(t *testing.T) {
 	writeSkill(t, target, "# Profile\n")
 	skillSpectorFixture := filepath.Join(dir, "skillspector.json")
 	writeFile(t, skillSpectorFixture, `{"status":"clean","findings":[]}`)
+	aigFixture := filepath.Join(dir, "aig.sarif.json")
+	writeFile(t, aigFixture, `{"version":"2.1.0","runs":[{"results":[]}]}`)
 
 	stdout := captureStdout(t, func() {
 		if err := run([]string{
 			target,
 			"--profile", "clawhub",
 			"--scanner-result", "skillspector=" + skillSpectorFixture,
+			"--scanner-result", "aig=" + aigFixture,
 			"--judge", clawHubReceiptJudgeCommand(),
 			"--sandbox", "off",
 			"--json",
@@ -1071,6 +1074,9 @@ func TestRunCommandUsesBuiltInProfile(t *testing.T) {
 	if _, ok := artifact.Scanners["clawscan-static"]; !ok {
 		t.Fatalf("missing clawscan-static scanner: %#v", artifact.Scanners)
 	}
+	if _, ok := artifact.Scanners["aig"]; !ok {
+		t.Fatalf("missing aig scanner: %#v", artifact.Scanners)
+	}
 	if artifact.Judge == nil || artifact.Judge.Status != "completed" {
 		t.Fatalf("judge = %#v", artifact.Judge)
 	}
@@ -1082,12 +1088,15 @@ func TestRunCommandDiscoversSkillsWithExplicitProfile(t *testing.T) {
 	writeSkill(t, filepath.Join(dir, "skills", "bar"), "# Bar\n")
 	skillSpectorFixture := filepath.Join(dir, "skillspector.json")
 	writeFile(t, skillSpectorFixture, `{"status":"clean","findings":[]}`)
+	aigFixture := filepath.Join(dir, "aig.sarif.json")
+	writeFile(t, aigFixture, `{"version":"2.1.0","runs":[{"results":[]}]}`)
 	t.Chdir(dir)
 
 	stdout := captureStdout(t, func() {
 		if err := run([]string{
 			"--profile", "clawhub",
 			"--scanner-result", "skillspector=" + skillSpectorFixture,
+			"--scanner-result", "aig=" + aigFixture,
 			"--judge", clawHubReceiptJudgeCommand(),
 			"--sandbox", "off",
 			"--json",
