@@ -2849,6 +2849,57 @@ func TestSkillSpectorDefaultsProviderToOpenAIWhenOpenAIKeyIsPresent(t *testing.T
 	}
 }
 
+func TestAIGReusesCodexAPIKeyWhenNoOtherKeyIsSet(t *testing.T) {
+	// The clawhub judge command already treats CODEX_API_KEY as an accepted
+	// OPENAI_API_KEY substitute, so existing CODEX_API_KEY-only ClawHub
+	// deployments must keep working once aig joins the profile's scanners.
+	env := map[string]string{"CODEX_API_KEY": "codex-value"}
+	defaultAIGKeyFromCodex(env)
+	if env["OPENAI_API_KEY"] != "codex-value" {
+		t.Fatalf("OPENAI_API_KEY not backfilled from CODEX_API_KEY: %#v", env)
+	}
+
+	preferExisting := map[string]string{"CODEX_API_KEY": "codex-value", "OPENAI_API_KEY": "openai-value"}
+	defaultAIGKeyFromCodex(preferExisting)
+	if preferExisting["OPENAI_API_KEY"] != "openai-value" {
+		t.Fatalf("existing OPENAI_API_KEY was overwritten: %#v", preferExisting)
+	}
+
+	preferLLMKey := map[string]string{"CODEX_API_KEY": "codex-value", "LLM_API_KEY": "llm-value"}
+	defaultAIGKeyFromCodex(preferLLMKey)
+	if _, ok := preferLLMKey["OPENAI_API_KEY"]; ok {
+		t.Fatalf("OPENAI_API_KEY backfilled despite existing LLM_API_KEY: %#v", preferLLMKey)
+	}
+
+	withoutCodexKey := map[string]string{}
+	defaultAIGKeyFromCodex(withoutCodexKey)
+	if _, ok := withoutCodexKey["OPENAI_API_KEY"]; ok {
+		t.Fatalf("OPENAI_API_KEY backfilled without a CODEX_API_KEY source: %#v", withoutCodexKey)
+	}
+}
+
+func TestApplyRuntimeEnvDefaultsBackfillsAIGKeyOnlyWhenAIGRequested(t *testing.T) {
+	requested, err := ParseArgs([]string{"./skill", "--scanner", "aig"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{"CODEX_API_KEY": "codex-value"}
+	applyRuntimeEnvDefaults(requested, env)
+	if err := ValidateRequirements(requested, env); err != nil {
+		t.Fatalf("unexpected requirement error after backfill: %v", err)
+	}
+
+	notRequested, err := ParseArgs([]string{"./skill", "--scanner", "clawscan-static"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unaffected := map[string]string{"CODEX_API_KEY": "codex-value"}
+	applyRuntimeEnvDefaults(notRequested, unaffected)
+	if _, ok := unaffected["OPENAI_API_KEY"]; ok {
+		t.Fatalf("OPENAI_API_KEY backfilled without aig in the scanner list: %#v", unaffected)
+	}
+}
+
 func TestRunExecutesAgentVerusScanner(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "skill")

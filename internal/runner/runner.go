@@ -2199,9 +2199,30 @@ func defaultSkillSpectorOpenAIProvider(env map[string]string) {
 	env["SKILLSPECTOR_PROVIDER"] = "openai"
 }
 
+// defaultAIGKeyFromCodex lets aig reuse an already-configured CODEX_API_KEY
+// when no LLM_API_KEY/OPENAI_API_KEY is set. The ClawHub judge command itself
+// already treats CODEX_API_KEY as an accepted OPENAI_API_KEY substitute
+// (see internal/profiles/clawhub/clawscan.yml), so aig's own credential
+// requirement should honor the same fallback instead of demanding a second,
+// separately-named key from existing CODEX_API_KEY-only deployments.
+func defaultAIGKeyFromCodex(env map[string]string) {
+	if env == nil {
+		return
+	}
+	if strings.TrimSpace(env["LLM_API_KEY"]) != "" || strings.TrimSpace(env["OPENAI_API_KEY"]) != "" {
+		return
+	}
+	if codexKey := strings.TrimSpace(env["CODEX_API_KEY"]); codexKey != "" {
+		env["OPENAI_API_KEY"] = codexKey
+	}
+}
+
 func applyRuntimeEnvDefaults(opts Options, env map[string]string) {
 	if scannerRequested(opts, "skillspector") {
 		defaultSkillSpectorOpenAIProvider(env)
+	}
+	if scannerRequested(opts, "aig") {
+		defaultAIGKeyFromCodex(env)
 	}
 }
 
