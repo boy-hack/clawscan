@@ -12,6 +12,8 @@ profiles:
         - CODEX_API_KEY
         - SKILLSPECTOR_PROVIDER
         - LLM_API_KEY
+        - DEFAULT_MODEL
+        - DEFAULT_BASE_URL
     judge:
       command: >-
         [ -n "$CODEX_API_KEY" ] || export CODEX_API_KEY="$OPENAI_API_KEY";
@@ -40,6 +42,8 @@ profiles:
         - CODEX_API_KEY
         - SKILLSPECTOR_PROVIDER
         - LLM_API_KEY
+        - DEFAULT_MODEL
+        - DEFAULT_BASE_URL
     judge:
       command: >-
         [ -n "$CODEX_API_KEY" ] || export CODEX_API_KEY="$OPENAI_API_KEY";

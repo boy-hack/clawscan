@@ -2849,32 +2849,54 @@ func TestSkillSpectorDefaultsProviderToOpenAIWhenOpenAIKeyIsPresent(t *testing.T
 	}
 }
 
-func TestAIGReusesCodexAPIKeyWhenNoOtherKeyIsSet(t *testing.T) {
+func TestAIGRuntimeDefaultsKeepCredentialsOnTheirProvider(t *testing.T) {
 	// The clawhub judge command already treats CODEX_API_KEY as an accepted
-	// OPENAI_API_KEY substitute, so existing CODEX_API_KEY-only ClawHub
-	// deployments must keep working once aig joins the profile's scanners.
-	env := map[string]string{"CODEX_API_KEY": "codex-value"}
-	defaultAIGKeyFromCodex(env)
-	if env["OPENAI_API_KEY"] != "codex-value" {
-		t.Fatalf("OPENAI_API_KEY not backfilled from CODEX_API_KEY: %#v", env)
+	// OpenAI credential. AIG defaults to OpenRouter, so reuse must also bind the
+	// request to OpenAI without enabling SkillSpector's OpenAI mode.
+	env := map[string]string{"CODEX_API_KEY": "fake"}
+	defaultAIGRuntimeEnv(env)
+	if env["LLM_API_KEY"] != "fake" {
+		t.Fatalf("LLM_API_KEY not backfilled from CODEX_API_KEY: %#v", env)
+	}
+	if env["DEFAULT_MODEL"] != defaultAIGOpenAIModel || env["DEFAULT_BASE_URL"] != defaultAIGOpenAIBaseURL {
+		t.Fatalf("AIG OpenAI defaults not applied: %#v", env)
+	}
+	if skillSpectorLLMEnabled(env) {
+		t.Fatalf("AIG fallback unexpectedly enabled SkillSpector LLM mode: %#v", env)
 	}
 
-	preferExisting := map[string]string{"CODEX_API_KEY": "codex-value", "OPENAI_API_KEY": "openai-value"}
-	defaultAIGKeyFromCodex(preferExisting)
-	if preferExisting["OPENAI_API_KEY"] != "openai-value" {
-		t.Fatalf("existing OPENAI_API_KEY was overwritten: %#v", preferExisting)
+	openAI := map[string]string{"OPENAI_API_KEY": "fake"}
+	defaultAIGRuntimeEnv(openAI)
+	if openAI["DEFAULT_MODEL"] != defaultAIGOpenAIModel || openAI["DEFAULT_BASE_URL"] != defaultAIGOpenAIBaseURL {
+		t.Fatalf("OPENAI_API_KEY did not select OpenAI defaults: %#v", openAI)
+	}
+	if _, ok := openAI["LLM_API_KEY"]; ok {
+		t.Fatalf("LLM_API_KEY backfilled despite existing OPENAI_API_KEY: %#v", openAI)
 	}
 
-	preferLLMKey := map[string]string{"CODEX_API_KEY": "codex-value", "LLM_API_KEY": "llm-value"}
-	defaultAIGKeyFromCodex(preferLLMKey)
-	if _, ok := preferLLMKey["OPENAI_API_KEY"]; ok {
-		t.Fatalf("OPENAI_API_KEY backfilled despite existing LLM_API_KEY: %#v", preferLLMKey)
+	explicitOpenAI := map[string]string{
+		"OPENAI_API_KEY":   "fake",
+		"DEFAULT_MODEL":    "custom-model",
+		"DEFAULT_BASE_URL": "https://example.invalid/v1",
+	}
+	defaultAIGRuntimeEnv(explicitOpenAI)
+	if explicitOpenAI["DEFAULT_MODEL"] != "custom-model" || explicitOpenAI["DEFAULT_BASE_URL"] != "https://example.invalid/v1" {
+		t.Fatalf("explicit AIG provider settings were overwritten: %#v", explicitOpenAI)
 	}
 
-	withoutCodexKey := map[string]string{}
-	defaultAIGKeyFromCodex(withoutCodexKey)
-	if _, ok := withoutCodexKey["OPENAI_API_KEY"]; ok {
-		t.Fatalf("OPENAI_API_KEY backfilled without a CODEX_API_KEY source: %#v", withoutCodexKey)
+	dedicated := map[string]string{"CODEX_API_KEY": "fake", "OPENAI_API_KEY": "fake", "LLM_API_KEY": "fake"}
+	defaultAIGRuntimeEnv(dedicated)
+	if _, ok := dedicated["DEFAULT_MODEL"]; ok {
+		t.Fatalf("dedicated LLM_API_KEY received an OpenAI model default: %#v", dedicated)
+	}
+	if _, ok := dedicated["DEFAULT_BASE_URL"]; ok {
+		t.Fatalf("dedicated LLM_API_KEY received an OpenAI base URL default: %#v", dedicated)
+	}
+
+	withoutKey := map[string]string{}
+	defaultAIGRuntimeEnv(withoutKey)
+	if len(withoutKey) != 0 {
+		t.Fatalf("AIG defaults applied without a credential source: %#v", withoutKey)
 	}
 }
 
@@ -2883,20 +2905,32 @@ func TestApplyRuntimeEnvDefaultsBackfillsAIGKeyOnlyWhenAIGRequested(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := map[string]string{"CODEX_API_KEY": "codex-value"}
+	env := map[string]string{"CODEX_API_KEY": "fake"}
 	applyRuntimeEnvDefaults(requested, env)
 	if err := ValidateRequirements(requested, env); err != nil {
 		t.Fatalf("unexpected requirement error after backfill: %v", err)
+	}
+	if env["LLM_API_KEY"] != "fake" {
+		t.Fatalf("AIG key not backfilled into LLM_API_KEY: %#v", env)
+	}
+	if env["DEFAULT_MODEL"] != defaultAIGOpenAIModel || env["DEFAULT_BASE_URL"] != defaultAIGOpenAIBaseURL {
+		t.Fatalf("AIG OpenAI defaults not applied: %#v", env)
+	}
+	if skillSpectorLLMEnabled(env) {
+		t.Fatalf("AIG fallback unexpectedly enabled SkillSpector LLM mode: %#v", env)
 	}
 
 	notRequested, err := ParseArgs([]string{"./skill", "--scanner", "clawscan-static"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	unaffected := map[string]string{"CODEX_API_KEY": "codex-value"}
+	unaffected := map[string]string{"CODEX_API_KEY": "fake"}
 	applyRuntimeEnvDefaults(notRequested, unaffected)
-	if _, ok := unaffected["OPENAI_API_KEY"]; ok {
-		t.Fatalf("OPENAI_API_KEY backfilled without aig in the scanner list: %#v", unaffected)
+	if _, ok := unaffected["LLM_API_KEY"]; ok {
+		t.Fatalf("LLM_API_KEY backfilled without aig in the scanner list: %#v", unaffected)
+	}
+	if _, ok := unaffected["DEFAULT_BASE_URL"]; ok {
+		t.Fatalf("AIG provider defaults applied without aig in the scanner list: %#v", unaffected)
 	}
 }
 

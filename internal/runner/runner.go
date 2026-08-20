@@ -2199,21 +2199,34 @@ func defaultSkillSpectorOpenAIProvider(env map[string]string) {
 	env["SKILLSPECTOR_PROVIDER"] = "openai"
 }
 
-// defaultAIGKeyFromCodex lets aig reuse an already-configured CODEX_API_KEY
-// when no LLM_API_KEY/OPENAI_API_KEY is set. The ClawHub judge command itself
-// already treats CODEX_API_KEY as an accepted OPENAI_API_KEY substitute
-// (see internal/profiles/clawhub/clawscan.yml), so aig's own credential
-// requirement should honor the same fallback instead of demanding a second,
-// separately-named key from existing CODEX_API_KEY-only deployments.
-func defaultAIGKeyFromCodex(env map[string]string) {
+const (
+	defaultAIGOpenAIModel   = "gpt-5.5"
+	defaultAIGOpenAIBaseURL = "https://api.openai.com/v1"
+)
+
+// defaultAIGRuntimeEnv keeps credentials on their intended provider. AIG's
+// upstream default is OpenRouter, so an OpenAI or Codex credential must also
+// select OpenAI's endpoint and a compatible model. A dedicated LLM_API_KEY
+// retains AIG's documented provider defaults.
+func defaultAIGRuntimeEnv(env map[string]string) {
 	if env == nil {
 		return
 	}
-	if strings.TrimSpace(env["LLM_API_KEY"]) != "" || strings.TrimSpace(env["OPENAI_API_KEY"]) != "" {
+	if strings.TrimSpace(env["LLM_API_KEY"]) != "" {
 		return
 	}
-	if codexKey := strings.TrimSpace(env["CODEX_API_KEY"]); codexKey != "" {
-		env["OPENAI_API_KEY"] = codexKey
+	if strings.TrimSpace(env["OPENAI_API_KEY"]) == "" {
+		codexKey := strings.TrimSpace(env["CODEX_API_KEY"])
+		if codexKey == "" {
+			return
+		}
+		env["LLM_API_KEY"] = codexKey
+	}
+	if strings.TrimSpace(env["DEFAULT_MODEL"]) == "" {
+		env["DEFAULT_MODEL"] = defaultAIGOpenAIModel
+	}
+	if strings.TrimSpace(env["DEFAULT_BASE_URL"]) == "" {
+		env["DEFAULT_BASE_URL"] = defaultAIGOpenAIBaseURL
 	}
 }
 
@@ -2222,7 +2235,7 @@ func applyRuntimeEnvDefaults(opts Options, env map[string]string) {
 		defaultSkillSpectorOpenAIProvider(env)
 	}
 	if scannerRequested(opts, "aig") {
-		defaultAIGKeyFromCodex(env)
+		defaultAIGRuntimeEnv(env)
 	}
 }
 
